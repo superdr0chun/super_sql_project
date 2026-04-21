@@ -22,7 +22,7 @@
 4. Запусти сервер:
     python manage.py runserver
 5. Открой ссылку
-    [text](http://127.0.0.1:8000)
+    [на свой сервер Django](http://127.0.0.1:8000)
 
 ## Технологии
 - Django + DRF

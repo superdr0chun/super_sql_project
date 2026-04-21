@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>SUPER_DB_EDITOR_ZDAROV</title>
+    <style>
+        :root {
+            --navy: #0b132b;
+            --gold: #c5a059;
+            --white: #ffffff;
+            --gray: #f1f5f9;
+            --text: #1e293b;
+            --border: #cbd5e1;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--gray);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+        }
+        #bg-observer {
+            position: fixed; inset: 0;
+            background: url('https://img.ofisarium.ru/212082.webp') center/cover no-repeat;
+            opacity: 0.15;
+            z-index: 0;
+            pointer-events: none;
+        }
+        #sidebar {
+            width: 300px;
+            background: var(--navy);
+            border-right: 3px solid var(--gold);
+            display: flex; flex-direction: column;
+            padding: 20px;
+            z-index: 10;
+            box-shadow: 5px 0 20px rgba(0,0,0,0.15);
+        }
+        #logo {
+            font-size: 18px; font-weight: 800;
+            color: var(--gold);
+            text-transform: uppercase; letter-spacing: 1px;
+            border-bottom: 1px solid rgba(197,160,89,0.3);
+            padding-bottom: 15px; margin-bottom: 15px;
+            text-align: center;
+        }
+        #flag-clicker {
+            width: 100%; height: 60px;
+            cursor: pointer; position: relative;
+            overflow: hidden; border: 2px solid var(--gold);
+            border-radius: 8px; margin-bottom: 10px;
+            transition: transform 0.1s, box-shadow 0.2s;
+            display: flex; flex-direction: column;
+        }
+        #flag-clicker:hover { transform: scale(1.02); box-shadow: 0 0 15px rgba(197,160,89,0.4); }
+        #flag-clicker:active { transform: scale(0.98); }
+        .flag-stripe { flex: 1; width: 100%; }
+        .flag-stripe.white { background: #ffffff; }
+        .flag-stripe.blue { background: #0039a6; }
+        .flag-stripe.red { background: #d52b1e; }
+        #click-counter {
+            color: var(--gold); text-align: center;
+            margin-bottom: 20px; font-weight: bold; font-size: 22px;
+            text-shadow: 0 0 5px rgba(197,160,89,0.3);
+        }
+        .click-hint {
+            color: #94a3b8; font-size: 11px; text-align: center;
+            margin-top: -15px; margin-bottom: 15px;
+        }
+        #tables-list { flex: 1; overflow-y: auto; }
+        .table-item {
+            padding: 12px; margin-bottom: 6px;
+            background: transparent; border: none; border-left: 3px solid transparent;
+            color: #e2e8f0; cursor: pointer; transition: 0.2s;
+            display: flex; justify-content: space-between; font-weight: 500;
+        }
+        .table-item:hover, .table-item.active {
+            background: rgba(197,160,89,0.15);
+            border-left-color: var(--gold);
+            color: var(--gold);
+        }
+        #main { flex: 1; display: flex; flex-direction: column; padding: 25px; z-index: 10; position: relative; }
+        .panel {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-top: 4px solid var(--gold);
+            padding: 20px; margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            border-radius: 8px;
+        }
+        h1, h2, h3 { color: var(--navy); font-weight: 600; margin-bottom: 12px; }
+        h1 { font-size: 22px; letter-spacing: -0.5px; }
+        textarea, input {
+            width: 100%; background: var(--gray);
+            border: 1px solid var(--border); color: var(--text);
+            padding: 12px; font-family: inherit; font-size: 14px;
+            border-radius: 6px; outline: none; transition: 0.2s;
+        }
+        textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(197,160,89,0.2); }
+        .btn {
+            background: var(--navy); color: var(--white);
+            border: none; padding: 10px 20px; cursor: pointer;
+            font-weight: 500; border-radius: 6px; margin-right: 8px;
+            transition: 0.2s; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px;
+        }
+        .btn:hover { background: var(--gold); color: var(--navy); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(197,160,89,0.3); }
+        .btn-danger { background: #ef4444; }
+        .btn-danger:hover { background: #dc2626; box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
+        #data-table { width: 100%; border-collapse: collapse; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+        #data-table th, #data-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        #data-table th { background: var(--navy); color: var(--gold); font-weight: 600; border-bottom: 2px solid var(--gold); }
+        #data-table tr { cursor: pointer; }
+        #data-table tr:hover { background: rgba(197,160,89,0.08); }
+        #context-menu {
+            position: absolute; display: none;
+            background: var(--white); border: 1px solid var(--border);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            border-radius: 6px; z-index: 100; padding: 6px; min-width: 220px;
+        }
+        .menu-item { 
+            padding: 10px 15px; 
+            color: var(--text); 
+            cursor: pointer; 
+            border-radius: 4px; 
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .menu-item:hover { background: var(--gold); color: var(--navy); }
+        .menu-divider { height: 1px; background: var(--border); margin: 6px 0; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--gray); }
+        ::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 4px; }
+
+        .z-particle {
+            position: fixed;
+            font-size: 42px;
+            font-weight: 900;
+            color: var(--gold);
+            text-shadow: 0 0 12px rgba(197,160,89,0.9), 2px 2px 0 #000;
+            pointer-events: none;
+            z-index: 1000;
+            user-select: none;
+        }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6); display: none;
+            justify-content: center; align-items: center; z-index: 2000;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: var(--white); border: 2px solid var(--gold);
+            border-radius: 8px; padding: 25px; min-width: 400px;
+            max-width: 600px; max-height: 80vh; overflow-y: auto;
+        }
+        .modal h3 { color: var(--navy); margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid var(--gold); }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; color: var(--navy); }
+        .form-group input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 4px; }
+        .modal-buttons { margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end; }
+    </style>
+</head>
+<body>
+    <div id="bg-observer"></div>
+    
+    <div id="sidebar">
+        <div id="logo">РЕДАКТОР БД "ЗДАРОВ"</div>
+        <div id="flag-clicker">
+            <div class="flag-stripe white"></div>
+            <div class="flag-stripe blue"></div>
+            <div class="flag-stripe red"></div>
+        </div>
+        <div id="click-counter">0</div>
+        <div id="tables-list"><div class="table-item" style="border:none; color:#94a3b8;">Загрузка таблиц...</div></div>
+    </div>
+
+    <div id="main">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+            <h1 id="current-view">Выберите таблицу слева</h1>
+            <div>
+                <button class="btn" onclick="loadTables()" title="Обновить список таблиц из базы данных">Обновить список таблиц</button>
+                <button class="btn btn-danger" onclick="clearSQL()" title="Очистить поле ввода SQL-запросов">Очистить SQL-консоль</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3>💻 Терминал SQL-запросов</h3>
+            <textarea id="sql-input" rows="4" placeholder=""></textarea>
+            <div style="margin-top: 10px;">
+                <button class="btn" onclick="executeRawSQL()" title="Выполнить все написанные запросы">▶ Выполнить всё</button>
+                <button class="btn" onclick="loadCurrentTableData()" title="Перезагрузить данные текущей таблицы">🔄 Перезагрузить данные</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3>Данные таблицы</h3>
+            <div id="data-container">
+                <p style="color: #94a3b8;"></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="context-menu">
+        <div class="menu-item" onclick="showAllRecords()"><span></span>Показать все записи</div>
+        <div class="menu-item" onclick="openAddModal()"><span></span>Добавить новую запись</div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" onclick="viewRecord()"><span></span>Просмотреть данные</div>
+        <div class="menu-item" onclick="copyRow()"><span></span>Скопировать как INSERT</div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" onclick="deleteRecord()" style="color: #ef4444;"><span></span>Удалить запись</div>
+    </div>
+
+    <div id="add-modal" class="modal-overlay">
+        <div class="modal">
+            <h3>Добавление новой записи</h3>
+            <div id="modal-form-content"></div>
+            <div class="modal-buttons">
+                <button class="btn" onclick="closeAddModal()">Отмена</button>
+                <button class="btn" onclick="submitAddRecord()" style="background: var(--gold); color: var(--navy);">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTable = null;
+        let selectedRowData = null;
+        let selectedRowId = null;
+        let clickCount = 0;
+        let tableDataCache = [];
+
+        const flagEl = document.getElementById('flag-clicker');
+        const counterEl = document.getElementById('click-counter');
+
+        flagEl.addEventListener('click', (e) => {
+            clickCount++;
+            counterEl.textContent = clickCount;
+            const z = document.createElement('div');
+            z.className = 'z-particle';
+            z.textContent = 'Z';
+            document.body.appendChild(z);
+            let x = e.clientX - 20, y = e.clientY;
+            const vx = (Math.random() - 0.5) * 3, vy = -2 - Math.random() * 2;
+            let opacity = 1, rotation = 0, rotSpeed = (Math.random() - 0.5) * 10;
+            z.style.left = `${x}px`; z.style.top = `${y}px`;
+            function animate() {
+                x += vx; y += vy; rotation += rotSpeed; opacity -= 0.006;
+                z.style.left = `${x}px`; z.style.top = `${y}px`;
+                z.style.transform = `rotate(${rotation}deg)`; z.style.opacity = opacity;
+                if (y < -60 || opacity <= 0) { z.remove(); return; }
+                requestAnimationFrame(animate);
+            }
+            requestAnimationFrame(animate);
+        });
+
+        window.onload = loadTables;
+
+        function loadTables() {
+            fetch('/api/tables/')
+                .then(res => res.json())
+                .then(tables => {
+                    const list = document.getElementById('tables-list');
+                    list.innerHTML = '';
+                    if(tables.length === 0) {
+                        list.innerHTML = '<div style="color:#ef4444; padding:10px;">Ошибка: Таблицы не найдены</div>';
+                        return;
+                    }
+                    tables.forEach(t => {
+                        const el = document.createElement('div');
+                        el.className = 'table-item';
+                        el.innerText = `${t.toUpperCase()}`;
+                        el.onclick = () => selectTable(t);
+                        list.appendChild(el);
+                    });
+                });
+        }
+
+        function selectTable(tableName) {
+            currentTable = tableName;
+            document.getElementById('current-view').innerText = `Таблица: ${tableName.toUpperCase()}`;
+            document.querySelectorAll('.table-item').forEach(el => el.classList.remove('active'));
+            event.target.classList.add('active');
+            loadCurrentTableData();
+        }
+
+        function loadCurrentTableData() {
+            if (!currentTable) return;
+            fetch(`/api/tables/${currentTable}/data/`)
+                .then(res => res.json())
+                .then(data => {
+                    const container = document.getElementById('data-container');
+                    if (data.length === 0) { container.innerHTML = '<p style="color:#ef4444">Таблица пуста</p>'; return; }
+                    renderTableHTML(data);
+                });
+        }
+
+        function renderTableHTML(data) {
+            const container = document.getElementById('data-container');
+            tableDataCache = data;
+            const headers = Object.keys(data[0]);
+            let html = '<table id="data-table"><thead><tr>';
+            headers.forEach(h => html += `<th>${h}</th>`);
+            html += '</tr></thead><tbody>';
+            data.forEach((row, index) => {
+                html += `<tr data-index="${index}" oncontextmenu="showCtxByIndex(event, ${index})" onclick="selectRowByIndex(${index})">`;
+                headers.forEach(h => html += `<td>${row[h] !== null && row[h] !== undefined ? row[h] : 'NULL'}</td>`);
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            html += `<div style="padding:10px; background:var(--gray); margin-top:10px; border-radius:5px; text-align:center; font-weight:600;">Всего записей: ${data.length}</div>`;
+            container.innerHTML = html;
+        }
+
+        function selectRowByIndex(index) { selectedRowData = tableDataCache[index]; selectedRowId = selectedRowData.id || Object.values(selectedRowData)[0]; }
+        function showCtxByIndex(e, index) {
+            e.preventDefault(); e.stopPropagation(); selectRowByIndex(index);
+            const menu = document.getElementById('context-menu');
+            menu.style.display = 'block';
+            let left = e.pageX, top = e.pageY;
+            if (left + 220 > window.innerWidth) left = e.pageX - 220;
+            if (top + 250 > window.innerHeight) top = e.pageY - 250;
+            menu.style.left = left + 'px'; menu.style.top = top + 'px';
+        }
+        document.addEventListener('click', () => { document.getElementById('context-menu').style.display = 'none'; });
+
+        function showAllRecords() { if (currentTable) loadCurrentTableData(); else alert('Сначала выберите таблицу!'); }
+        
+        function openAddModal() {
+            if (!currentTable) { alert('Сначала выберите таблицу!'); return; }
+            fetch(`/api/tables/${currentTable}/structure/`)
+                .then(res => res.json())
+                .then(columns => {
+                    const formContent = document.getElementById('modal-form-content');
+                    let html = '';
+                    columns.forEach(col => {
+                        if (col.name.toLowerCase() !== 'id') {
+                            html += `<div class="form-group"><label>${col.name} <span style="color:#94a3b8; font-weight:normal;">(${col.type})</span></label><input type="text" id="field-${col.name}" placeholder="Введите значение для ${col.name}"></div>`;
+                        }
+                    });
+                    formContent.innerHTML = html;
+                    document.getElementById('add-modal').classList.add('active');
+                });
+        }
+        function closeAddModal() { document.getElementById('add-modal').classList.remove('active'); }
+        function submitAddRecord() {
+            if (!currentTable) return;
+            const inputs = document.querySelectorAll('#modal-form-content input');
+            const data = {}; let hasData = false;
+            inputs.forEach(input => {
+                const fieldName = input.id.replace('field-', '');
+                const value = input.value.trim();
+                if (value) { data[fieldName] = !isNaN(value) ? parseFloat(value) : value; hasData = true; }
+            });
+            if (!hasData) { alert('Введите хотя бы одно значение!'); return; }
+            const columns = Object.keys(data).join(', ');
+            const values = Object.values(data).map(v => typeof v === 'string' ? `'${v.replace(/'/g, "''")}'` : v).join(', ');
+            const sql = `INSERT INTO ${currentTable} (${columns}) VALUES (${values});`;
+            fetch('/api/raw-sql/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({sql}) })
+            .then(res => res.json()).then(result => {
+                if (result.error) alert(`Ошибка: ${result.error}`);
+                else { alert('Запись успешно добавлена!'); closeAddModal(); loadCurrentTableData(); }
+            });
+        }
+
+        function deleteRecord() {
+            if (!selectedRowData || !selectedRowId) { alert('Выберите запись!'); return; }
+            let info = 'Удалить запись?\n\n';
+            for (let key in selectedRowData) info += `${key}: ${selectedRowData[key]}\n`;
+            if (confirm(info)) {
+                const sql = `DELETE FROM ${currentTable} WHERE id = ${selectedRowId};`;
+                fetch('/api/raw-sql/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({sql}) })
+                .then(res => res.json()).then(result => {
+                    if (result.error) alert(`Ошибка: ${result.error}`);
+                    else { alert('Удалено!'); loadCurrentTableData(); }
+                });
+            }
+        }
+        function viewRecord() {
+            if (!selectedRowData) return;
+            let info = 'Данные:\n\n';
+            for (let key in selectedRowData) info += `${key}: ${selectedRowData[key]}\n`;
+            alert(info);
+        }
+        function copyRow() {
+            if (!selectedRowData || !currentTable) return;
+            const cols = Object.keys(selectedRowData).join(', ');
+            const vals = Object.values(selectedRowData).map(v => typeof v === 'string' ? `'${v.replace(/'/g, "''")}'` : v).join(', ');
+            navigator.clipboard.writeText(`INSERT INTO ${currentTable} (${cols}) VALUES (${vals});`);
+            alert('Скопировано в буфер!');
+        }
+
+        function executeRawSQL() {
+            const sql = document.getElementById('sql-input').value;
+            if (!sql) { alert('Введите SQL-запрос!'); return; }
+            fetch('/api/raw-sql/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({sql}) })
+            .then(res => res.json())
+            .then(data => {
+                if(data.error) alert(`Ошибка:\n${data.error}`);
+                else if(Array.isArray(data)) { renderTableHTML(data); document.getElementById('current-view').innerText = `Результат (${data.length} записей)`; }
+                else { alert(data.message || 'Выполнено!'); if(currentTable) loadCurrentTableData(); }
+            });
+        }
+        function clearSQL() { document.getElementById('sql-input').value = ''; }
+    </script>
+</body>
+</html>

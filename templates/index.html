@@ -156,6 +156,10 @@
     
     <div id="sidebar">
         <div id="logo">РЕДАКТОР БД "ЗДАРОВ"</div>
+        <div style="text-align:center; margin-bottom:15px;">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/f/f3/Flag_of_Russia.svg" alt="RF" style="width:60px; height:40px; border:1px solid #ccc; cursor:pointer;" onclick="clickCounter++" id="flag-img">
+            <div style="color:#94a3b8; font-size:12px; margin-top:5px;">Кликов: <span id="click-count">0</span></div>
+        </div>
         
         <div class="section-title">Серверы</div>
         <button class="btn" onclick="openServerModal()" style="width:100%;margin-bottom:10px;font-size:12px;padding:8px;">+ Добавить сервер</button>
@@ -179,11 +183,11 @@
         </div>
 
         <div class="panel">
-            <h3>💻 Терминал SQL-запросов</h3>
+            <h3>Терминал SQL-запросов</h3>
             <textarea id="sql-input" rows="4" placeholder=""></textarea>
             <div style="margin-top: 10px;">
-                <button class="btn" onclick="executeRawSQL()" title="Выполнить все написанные запросы">▶ Выполнить всё</button>
-                <button class="btn" onclick="loadCurrentTableData()" title="Перезагрузить данные текущей таблицы">🔄 Перезагрузить данные</button>
+                <button class="btn" onclick="executeRawSQL()" title="Выполнить все написанные запросы">Выполнить всё</button>
+                <button class="btn" onclick="loadCurrentTableData()" title="Перезагрузить данные текущей таблицы">Перезагрузить данные</button>
             </div>
         </div>
 
@@ -223,6 +227,11 @@
         let tableDataCache = [];
         let currentServerId = null;
         let currentDatabaseId = null;
+        let clickCounter = 0;
+
+        setInterval(function() {
+            document.getElementById('click-count').innerText = clickCounter;
+        }, 100);
 
         window.onload = function() {
             loadServers();
@@ -355,10 +364,12 @@
                         list.innerHTML = '<div style="color:#ef4444; padding:10px;">Ошибка: Таблицы не найдены</div>';
                         return;
                     }
+                    const hiddenTables = ['auth_group', 'auth_permission', 'auth_group_permissions', 'auth_user', 'auth_user_groups', 'auth_user_permissions', 'db_servers', 'db_databases'];
                     tables.forEach(t => {
+                        if (hiddenTables.includes(t.toLowerCase())) return;
                         const el = document.createElement('div');
                         el.className = 'table-item';
-                        el.innerText = `${t.toUpperCase()}`;
+                        el.innerText = t.toUpperCase();
                         el.onclick = () => selectTable(t);
                         list.appendChild(el);
                     });

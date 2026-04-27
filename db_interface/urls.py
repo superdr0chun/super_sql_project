@@ -9,4 +9,8 @@ urlpatterns = [
     path('records/create/', views.create_record, name='create-record'),
     path('records/<int:pk>/delete/', views.delete_record, name='delete-record'),
     path('raw-sql/', views.execute_raw_sql, name='raw-sql'),
+    path('connections/', views.get_connections, name='connections-list'),
+    path('connections/create/', views.create_connection, name='connection-create'),
+    path('connections/<int:pk>/delete/', views.delete_connection, name='connection-delete'),
+    path('connections/<int:pk>/switch/', views.switch_connection, name='connection-switch'),
 ]

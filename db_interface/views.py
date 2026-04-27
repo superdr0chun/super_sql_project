@@ -6,10 +6,115 @@ from django.conf import settings
 import json
 
 @api_view(['GET'])
+def get_servers(request):
+    from .models import DatabaseServer
+    servers = DatabaseServer.objects.all().values('id', 'name', 'host', 'port', 'username', 'created_at')
+    return Response(list(servers))
+
+@api_view(['POST'])
+def create_server(request):
+    from .models import DatabaseServer
+    name = request.data.get('name')
+    host = request.data.get('host', 'localhost')
+    port = request.data.get('port', 5432)
+    username = request.data.get('username', 'postgres')
+    password = request.data.get('password', '')
+    
+    if not name:
+        return Response({"error": "Имя сервера обязательно"}, status=400)
+    
+    try:
+        server = DatabaseServer.objects.create(
+            name=name,
+            host=host,
+            port=port,
+            username=username,
+            password=password
+        )
+        return Response({"id": server.id, "message": "Сервер создан"})
+    except Exception as e:
+        return Response({"error": str(e)}, status=400)
+
+@api_view(['DELETE'])
+def delete_server(request, pk):
+    from .models import DatabaseServer
+    try:
+        server = DatabaseServer.objects.get(pk=pk)
+        server.delete()
+        return Response({"message": "Сервер удален"})
+    except DatabaseServer.DoesNotExist:
+        return Response({"error": "Сервер не найден"}, status=404)
+
+@api_view(['GET'])
+def get_databases(request, server_id):
+    from .models import Database, DatabaseServer
+    try:
+        server = DatabaseServer.objects.get(pk=server_id)
+        databases = server.databases.all().values('id', 'name', 'created_at')
+        return Response(list(databases))
+    except DatabaseServer.DoesNotExist:
+        return Response({"error": "Сервер не найден"}, status=404)
+
+@api_view(['POST'])
+def create_database(request, server_id):
+    from .models import Database, DatabaseServer
+    name = request.data.get('name')
+    
+    if not name:
+        return Response({"error": "Имя базы данных обязательно"}, status=400)
+    
+    try:
+        server = DatabaseServer.objects.get(pk=server_id)
+        db = Database.objects.create(server=server, name=name)
+        return Response({"id": db.id, "message": "База данных создана"})
+    except DatabaseServer.DoesNotExist:
+        return Response({"error": "Сервер не найден"}, status=404)
+    except Exception as e:
+        return Response({"error": str(e)}, status=400)
+
+@api_view(['DELETE'])
+def delete_database(request, server_id, db_id):
+    from .models import Database
+    try:
+        db = Database.objects.get(pk=db_id, server_id=server_id)
+        db.delete()
+        return Response({"message": "База данных удалена"})
+    except Database.DoesNotExist:
+        return Response({"error": "База данных не найдена"}, status=404)
+
+@api_view(['POST'])
+def connect_to_database(request, server_id, db_id):
+    from .models import Database, DatabaseServer
+    try:
+        db_obj = Database.objects.get(pk=db_id, server_id=server_id)
+        server = db_obj.server
+        
+        new_settings = {
+            'ENGINE': 'django.db.backends.postgresql',
+            'HOST': server.host,
+            'PORT': server.port,
+            'NAME': db_obj.name,
+            'USER': server.username,
+            'PASSWORD': server.password,
+            'ATOMIC_REQUESTS': False,
+            'AUTOCOMMIT': True,
+            'CONN_MAX_AGE': 0
+        }
+        
+        settings.DATABASES['default'] = new_settings
+        connections['default'].close()
+        
+        return Response({"message": f"Подключено к {db_obj.name} на {server.name}"})
+    except Database.DoesNotExist:
+        return Response({"error": "База данных не найдена"}, status=404)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['GET'])
 def get_tables_list(request):
     with connection.cursor() as cursor:
         try:
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'django_%' AND name != 'db_connections'")
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'django_%' AND name NOT LIKE 'db_%'")
             tables = [row[0] for row in cursor.fetchall()]
             return Response(tables)
         except Exception:
@@ -74,79 +179,6 @@ def execute_raw_sql(request):
         return Response(last_select_data)
     else:
         return Response({"message": f"Успешно выполнено запросов: {len(queries)}"})
-
-@api_view(['GET'])
-def get_connections(request):
-    from .models import DatabaseConnection
-    connections_list = DatabaseConnection.objects.all().values('id', 'name', 'db_type', 'host', 'port', 'database_name', 'created_at')
-    return Response(list(connections_list))
-
-@api_view(['POST'])
-def create_connection(request):
-    from .models import DatabaseConnection
-    name = request.data.get('name')
-    db_type = request.data.get('db_type', 'sqlite')
-    host = request.data.get('host', '')
-    port = request.data.get('port')
-    database_name = request.data.get('database_name')
-    username = request.data.get('username', '')
-    password = request.data.get('password', '')
-    
-    if not name or not database_name:
-        return Response({"error": "name и database_name обязательны"}, status=400)
-    
-    conn = DatabaseConnection.objects.create(
-        name=name,
-        db_type=db_type,
-        host=host or None,
-        port=port,
-        database_name=database_name,
-        username=username or None,
-        password=password or None
-    )
-    return Response({"id": conn.id, "message": "Соединение создано"})
-
-@api_view(['DELETE'])
-def delete_connection(request, pk):
-    from .models import DatabaseConnection
-    try:
-        conn = DatabaseConnection.objects.get(pk=pk)
-        conn.delete()
-        return Response({"message": "Соединение удалено"})
-    except DatabaseConnection.DoesNotExist:
-        return Response({"error": "Соединение не найдено"}, status=404)
-
-@api_view(['POST'])
-def switch_connection(request, pk):
-    from .models import DatabaseConnection
-    try:
-        conn = DatabaseConnection.objects.get(pk=pk)
-        
-        new_settings = dict(settings.DATABASES['default'])
-        
-        if conn.db_type == 'sqlite':
-            new_settings['ENGINE'] = 'django.db.backends.sqlite3'
-            new_settings['NAME'] = conn.database_name
-        else:
-            new_settings['ENGINE'] = 'django.db.backends.postgresql'
-            new_settings['HOST'] = conn.host
-            new_settings['PORT'] = conn.port or 5432
-            new_settings['NAME'] = conn.database_name
-            new_settings['USER'] = conn.username
-            new_settings['PASSWORD'] = conn.password
-        
-        new_settings['ATOMIC_REQUESTS'] = False
-        new_settings['AUTOCOMMIT'] = True
-        new_settings['CONN_MAX_AGE'] = 0
-        
-        settings.DATABASES['default'] = new_settings
-        connections['default'].close()
-        
-        return Response({"message": f"Переключено на {conn.name}"})
-    except DatabaseConnection.DoesNotExist:
-        return Response({"error": "Соединение не найдено"}, status=404)
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
 
 @api_view(['GET'])
 def get_all_records(request): 

@@ -2,46 +2,36 @@
 # Database
 db.sqlite3
 
-# Dependencies
-__pycache__/
+# Python
 *.pyc
+__pycache__/
 *.pyo
 *.pyd
-
-# Environment
-.env
-.env.local
-.env.*
-.venv/
+.Python
+env/
 venv/
-.envrc
-
-# Logs
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
 *.log
-
-# OS generated files
 .DS_Store
 Thumbs.db
 
-# Editors
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Python specific
-*.egg-info/
-dist/
-build/
-pip-log.txt
-.coverage
-htmlcov/
-.coverage.*
-
-# Testing
-.pytest_cache/
-.mypy_cache/
-
-# Backup files
-*~
+# Django
+*.mo
+*.pot
+*.pyc
+__pycache__/
+local_settings.py
+db.sqlite3
+media/
+staticfiles/
+.env
 ```

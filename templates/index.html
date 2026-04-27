@@ -528,18 +528,23 @@
             currentTable = tableName;
             document.getElementById('current-view').innerText = `Таблица: ${tableName.toUpperCase()}`;
             document.querySelectorAll('.table-item').forEach(el => el.classList.remove('active'));
-            event.target.classList.add('active');
+            if(event && event.currentTarget) event.currentTarget.classList.add('active');
             loadCurrentTableData();
         }
 
         function loadCurrentTableData() {
-            if (!currentTable) return;
-            fetch(`/api/tables/${currentTable}/data/`)
+            if (!currentTable || !currentDatabaseId) return;
+            fetch(`/api/tables/${currentTable}/data/?db_id=${currentDatabaseId}`)
                 .then(res => res.json())
                 .then(data => {
                     const container = document.getElementById('data-container');
-                    if (data.length === 0) { container.innerHTML = '<p style="color:#ef4444">Таблица пуста</p>'; return; }
+                    if (data.error) { container.innerHTML = `<p style="color:#ef4444">Ошибка: ${data.error}</p>`; return; }
+                    if (data.length === 0) { container.innerHTML = '<p style="color:#94a3b8">Таблица пуста</p>'; return; }
                     renderTableHTML(data);
+                })
+                .catch(err => {
+                    const container = document.getElementById('data-container');
+                    container.innerHTML = `<p style="color:#ef4444">Ошибка загрузки: ${err.message}</p>`;
                 });
         }
 

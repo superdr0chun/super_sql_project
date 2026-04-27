@@ -3,7 +3,23 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db import connection, connections
 from django.conf import settings
+from sqlalchemy import create_engine, text, inspect, MetaData, Table, Column, String, Integer, Float, Boolean, DateTime, Date, Text, ForeignKey
+from sqlalchemy.orm import sessionmaker
 import json
+
+_engines = {}
+
+def get_engine(server):
+    key = f"{server.id}_{server.name}"
+    if key not in _engines:
+        conn_str = f"postgresql://{server.username}:{server.password}@{server.host}:{server.port}/{server.name}"
+        _engines[key] = create_engine(conn_str)
+    return _engines[key]
+
+def get_db_engine(db_obj):
+    server = db_obj.server
+    conn_str = f"postgresql://{server.username}:{server.password}@{server.host}:{server.port}/{db_obj.name}"
+    return create_engine(conn_str)
 
 @api_view(['GET'])
 def get_servers(request):
@@ -65,6 +81,13 @@ def create_database(request, server_id):
     
     try:
         server = DatabaseServer.objects.get(pk=server_id)
+        
+        conn_str = f"postgresql://{server.username}:{server.password}@{server.host}:{server.port}/postgres"
+        engine = create_engine(conn_str)
+        
+        with engine.connect() as conn:
+            conn.execution_options(isolation_level="AUTOCOMMIT").execute(text(f"CREATE DATABASE {name}"))
+        
         db = Database.objects.create(server=server, name=name)
         return Response({"id": db.id, "message": "База данных создана"})
     except DatabaseServer.DoesNotExist:
@@ -77,10 +100,21 @@ def delete_database(request, server_id, db_id):
     from .models import Database
     try:
         db = Database.objects.get(pk=db_id, server_id=server_id)
+        db_name = db.name
+        server = db.server
+        
+        conn_str = f"postgresql://{server.username}:{server.password}@{server.host}:{server.port}/postgres"
+        engine = create_engine(conn_str)
+        
+        with engine.connect() as conn:
+            conn.execution_options(isolation_level="AUTOCOMMIT").execute(text(f"DROP DATABASE IF EXISTS {db_name}"))
+        
         db.delete()
         return Response({"message": "База данных удалена"})
     except Database.DoesNotExist:
         return Response({"error": "База данных не найдена"}, status=404)
+    except Exception as e:
+        return Response({"error": str(e)}, status=400)
 
 @api_view(['POST'])
 def connect_to_database(request, server_id, db_id):
@@ -112,6 +146,20 @@ def connect_to_database(request, server_id, db_id):
 
 @api_view(['GET'])
 def get_tables_list(request):
+    db_id = request.GET.get('db_id')
+    if db_id:
+        from .models import Database
+        try:
+            db_obj = Database.objects.get(pk=db_id)
+            engine = get_db_engine(db_obj)
+            inspector = inspect(engine)
+            tables = inspector.get_table_names()
+            hidden = ['auth_group', 'auth_permission', 'auth_group_permissions', 'auth_user', 'auth_user_groups', 'auth_user_permissions', 'db_servers', 'db_databases']
+            tables = [t for t in tables if t.lower() not in hidden]
+            return Response(tables)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+    
     with connection.cursor() as cursor:
         try:
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'django_%' AND name NOT LIKE 'db_%'")
@@ -127,6 +175,19 @@ def get_tables_list(request):
 
 @api_view(['GET'])
 def get_table_structure(request, table_name):
+    db_id = request.GET.get('db_id')
+    if db_id:
+        from .models import Database
+        try:
+            db_obj = Database.objects.get(pk=db_id)
+            engine = get_db_engine(db_obj)
+            inspector = inspect(engine)
+            columns = inspector.get_columns(table_name)
+            result = [{'name': c['name'], 'type': str(c['type']), 'nullable': c.get('nullable', True)} for c in columns]
+            return Response(result)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+    
     with connection.cursor() as cursor:
         try:
             cursor.execute(f"PRAGMA table_info({table_name})")
@@ -144,7 +205,23 @@ def get_table_structure(request, table_name):
 
 @api_view(['GET'])
 def get_table_data(request, table_name):
+    db_id = request.GET.get('db_id')
     limit = request.GET.get('limit', 100)
+    
+    if db_id:
+        from .models import Database
+        try:
+            db_obj = Database.objects.get(pk=db_id)
+            engine = get_db_engine(db_obj)
+            with engine.connect() as conn:
+                result = conn.execute(text(f"SELECT * FROM {table_name} LIMIT :limit"), {"limit": int(limit)})
+                columns = result.keys()
+                rows = result.fetchall()
+                data = [dict(zip(columns, row)) for row in rows]
+                return Response(data)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+    
     with connection.cursor() as cursor:
         try:
             cursor.execute(f"SELECT * FROM {table_name} LIMIT %s", [limit])
@@ -158,9 +235,36 @@ def get_table_data(request, table_name):
 @api_view(['POST'])
 def execute_raw_sql(request):
     sql_text = request.data.get('sql', '').strip()
+    db_id = request.data.get('db_id')
+    
     if not sql_text:
         return Response({"error": "Нет SQL"}, status=400)
 
+    if db_id:
+        from .models import Database
+        try:
+            db_obj = Database.objects.get(pk=db_id)
+            engine = get_db_engine(db_obj)
+            
+            queries = [q.strip() for q in sql_text.split(';') if q.strip()]
+            last_select_data = None
+            
+            with engine.connect() as conn:
+                for query in queries:
+                    result = conn.execute(text(query))
+                    if result.returns_rows:
+                        columns = result.keys()
+                        rows = result.fetchall()
+                        last_select_data = [dict(zip(columns, row)) for row in rows]
+                conn.commit()
+            
+            if last_select_data is not None:
+                return Response(last_select_data)
+            else:
+                return Response({"message": f"Успешно выполнено запросов: {len(queries)}"})
+        except Exception as e:
+            return Response({"error": f"Ошибка в запросе:\n{sql_text}\n\nДетали: {str(e)}"}, status=500)
+    
     queries = [q.strip() for q in sql_text.split(';') if q.strip()]
     last_select_data = None
 
@@ -179,6 +283,55 @@ def execute_raw_sql(request):
         return Response(last_select_data)
     else:
         return Response({"message": f"Успешно выполнено запросов: {len(queries)}"})
+
+@api_view(['POST'])
+def create_table(request):
+    db_id = request.data.get('db_id')
+    table_name = request.data.get('table_name')
+    columns = request.data.get('columns', [])
+    
+    if not db_id or not table_name:
+        return Response({"error": "db_id и table_name обязательны"}, status=400)
+    
+    from .models import Database
+    try:
+        db_obj = Database.objects.get(pk=db_id)
+        engine = get_db_engine(db_obj)
+        
+        type_map = {
+            'INTEGER': Integer,
+            'INT': Integer,
+            'VARCHAR': String,
+            'TEXT': Text,
+            'BOOLEAN': Boolean,
+            'DATE': Date,
+            'TIMESTAMP': DateTime,
+            'FLOAT': Float,
+            'STRING': String
+        }
+        
+        metadata = MetaData()
+        cols = []
+        for col in columns:
+            col_name = col.get('name')
+            col_type = col.get('type', 'VARCHAR').upper()
+            is_pk = col.get('is_pk', False)
+            
+            sa_type = type_map.get(col_type, String)
+            if sa_type == String:
+                column_obj = Column(col_name, sa_type(255), primary_key=is_pk)
+            elif sa_type == DateTime:
+                column_obj = Column(col_name, sa_type, primary_key=is_pk)
+            else:
+                column_obj = Column(col_name, sa_type, primary_key=is_pk)
+            cols.append(column_obj)
+        
+        new_table = Table(table_name, metadata, *cols)
+        metadata.create_all(engine)
+        
+        return Response({"message": f"Таблица {table_name} создана"})
+    except Exception as e:
+        return Response({"error": str(e)}, status=400)
 
 @api_view(['GET'])
 def get_all_records(request): 

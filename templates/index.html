@@ -336,7 +336,7 @@
         function toggleServerChildren(event, serverId) {
             event.stopPropagation();
             const childrenDiv = document.getElementById(`server-${serverId}-children`);
-            const btn = event.target;
+            const btn = event.target.closest('.expand-btn');
             if (childrenDiv.classList.contains('expanded')) {
                 childrenDiv.classList.remove('expanded');
                 btn.textContent = '▶';
@@ -379,7 +379,7 @@
         function toggleDatabaseChildren(event, serverId, databaseId) {
             event.stopPropagation();
             const childrenDiv = document.getElementById(`db-${databaseId}-children`);
-            const btn = event.target;
+            const btn = event.target.closest('.expand-btn');
             if (childrenDiv.classList.contains('expanded')) {
                 childrenDiv.classList.remove('expanded');
                 btn.textContent = '▶';
@@ -415,16 +415,24 @@
 
         function selectServer(serverId, serverName) {
             currentServerId = serverId;
-            document.querySelectorAll('.server-item').forEach(el => el.classList.remove('active'));
-            if(event && event.currentTarget) event.currentTarget.classList.add('active');
+            document.querySelectorAll('.server-item').forEach(el => {
+                el.classList.remove('active');
+                if(el.querySelector('span') && el.querySelector('span').textContent === serverName) {
+                    el.classList.add('active');
+                }
+            });
             document.getElementById('current-view').innerText = `Сервер: ${serverName}`;
         }
 
         function selectDatabase(serverId, databaseId, databaseName) {
             currentServerId = serverId;
             currentDatabaseId = databaseId;
-            document.querySelectorAll('.db-item').forEach(el => el.classList.remove('active'));
-            if(event && event.currentTarget) event.currentTarget.classList.add('active');
+            document.querySelectorAll('.db-item').forEach(el => {
+                el.classList.remove('active');
+                if(el.querySelector('span') && el.querySelector('span').textContent === databaseName) {
+                    el.classList.add('active');
+                }
+            });
             
             fetch(`/api/servers/${serverId}/databases/${databaseId}/connect/`, {method: 'POST'})
                 .then(() => {
@@ -527,24 +535,39 @@
         function selectTable(tableName) {
             currentTable = tableName;
             document.getElementById('current-view').innerText = `Таблица: ${tableName.toUpperCase()}`;
-            document.querySelectorAll('.table-item').forEach(el => el.classList.remove('active'));
-            if(event && event.currentTarget) event.currentTarget.classList.add('active');
+            document.querySelectorAll('.table-item').forEach(el => {
+                el.classList.remove('active');
+                if(el.querySelector('span') && el.querySelector('span').textContent === tableName.toUpperCase()) {
+                    el.classList.add('active');
+                }
+            });
             loadCurrentTableData();
         }
 
         function loadCurrentTableData() {
-            if (!currentTable || !currentDatabaseId) return;
+            if (!currentTable || !currentDatabaseId) {
+                console.log('Нет выбранной таблицы или БД:', currentTable, currentDatabaseId);
+                return;
+            }
+            const container = document.getElementById('data-container');
+            container.innerHTML = '<p style="color:#94a3b8">Загрузка данных...</p>';
+            
             fetch(`/api/tables/${currentTable}/data/?db_id=${currentDatabaseId}`)
                 .then(res => res.json())
                 .then(data => {
-                    const container = document.getElementById('data-container');
-                    if (data.error) { container.innerHTML = `<p style="color:#ef4444">Ошибка: ${data.error}</p>`; return; }
-                    if (data.length === 0) { container.innerHTML = '<p style="color:#94a3b8">Таблица пуста</p>'; return; }
+                    if (data.error) { 
+                        container.innerHTML = `<p style="color:#ef4444">Ошибка: ${data.error}</p>`; 
+                        return; 
+                    }
+                    if (!Array.isArray(data) || data.length === 0) { 
+                        container.innerHTML = '<p style="color:#94a3b8">Таблица пуста</p>'; 
+                        return; 
+                    }
                     renderTableHTML(data);
                 })
                 .catch(err => {
-                    const container = document.getElementById('data-container');
                     container.innerHTML = `<p style="color:#ef4444">Ошибка загрузки: ${err.message}</p>`;
+                    console.error('Ошибка загрузки данных таблицы:', err);
                 });
         }
 

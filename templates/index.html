@@ -405,8 +405,14 @@
                     visibleTables.forEach(tableName => {
                         const tableItem = document.createElement('div');
                         tableItem.className = 'table-item';
+                        tableItem.dataset.tableName = tableName;
+                        tableItem.dataset.databaseId = databaseId;
                         tableItem.innerHTML = `<span>${tableName.toUpperCase()}</span>`;
-                        tableItem.onclick = () => selectTable(tableName);
+                        tableItem.onclick = (e) => {
+                            e.stopPropagation();
+                            currentDatabaseId = databaseId;
+                            selectTable(tableName);
+                        };
                         tableItem.oncontextmenu = (e) => showTreeContextMenu(e, 'table', null, tableName);
                         container.appendChild(tableItem);
                     });
@@ -526,7 +532,10 @@
                         const el = document.createElement('div');
                         el.className = 'table-item';
                         el.innerText = t.toUpperCase();
-                        el.onclick = () => selectTable(t);
+                        el.onclick = () => {
+                            currentDatabaseId = currentDatabaseId;
+                            selectTable(t);
+                        };
                         list.appendChild(el);
                     });
                 });
@@ -535,26 +544,56 @@
         function selectTable(tableName) {
             currentTable = tableName;
             document.getElementById('current-view').innerText = `Таблица: ${tableName.toUpperCase()}`;
+            
+            // Снимаем выделение со всех таблиц и подсвечиваем выбранную
             document.querySelectorAll('.table-item').forEach(el => {
                 el.classList.remove('active');
-                if(el.querySelector('span') && el.querySelector('span').textContent === tableName.toUpperCase()) {
+                if(el.dataset.tableName === tableName) {
                     el.classList.add('active');
                 }
             });
+            
+            console.log('Выбрана таблица:', tableName, 'БД ID:', currentDatabaseId);
+            
+            // Принудительно загружаем данные
             loadCurrentTableData();
         }
 
         function loadCurrentTableData() {
-            if (!currentTable || !currentDatabaseId) {
-                console.log('Нет выбранной таблицы или БД:', currentTable, currentDatabaseId);
+            if (!currentTable) {
+                const container = document.getElementById('data-container');
+                container.innerHTML = '<p style="color:#94a3b8">Выберите таблицу слева</p>';
                 return;
             }
+            
+            if (!currentDatabaseId) {
+                // Пытаемся получить databaseId из выбранного элемента таблицы
+                const activeTable = document.querySelector('.table-item.active');
+                if (activeTable && activeTable.dataset.databaseId) {
+                    currentDatabaseId = activeTable.dataset.databaseId;
+                } else {
+                    const tableItem = document.querySelector(`.table-item[data-table-name="${currentTable}"]`);
+                    if (tableItem && tableItem.dataset.databaseId) {
+                        currentDatabaseId = tableItem.dataset.databaseId;
+                    }
+                }
+                
+                if (!currentDatabaseId) {
+                    const container = document.getElementById('data-container');
+                    container.innerHTML = '<p style="color:#ef4444">Ошибка: База данных не выбрана</p>';
+                    return;
+                }
+            }
+            
             const container = document.getElementById('data-container');
             container.innerHTML = '<p style="color:#94a3b8">Загрузка данных...</p>';
+            
+            console.log('Загрузка данных для таблицы:', currentTable, 'БД ID:', currentDatabaseId);
             
             fetch(`/api/tables/${currentTable}/data/?db_id=${currentDatabaseId}`)
                 .then(res => res.json())
                 .then(data => {
+                    console.log('Получены данные:', data);
                     if (data.error) { 
                         container.innerHTML = `<p style="color:#ef4444">Ошибка: ${data.error}</p>`; 
                         return; 
@@ -811,7 +850,15 @@
                 else {
                     alert('Таблица создана!');
                     closeCreateTableModal();
-                    loadTablesInTree(currentDatabaseId, document.getElementById(`db-${currentDatabaseId}-children`));
+                    // Обновляем дерево таблиц
+                    const childrenDiv = document.getElementById(`db-${currentDatabaseId}-children`);
+                    if (childrenDiv && childrenDiv.classList.contains('expanded')) {
+                        loadTablesInTree(currentDatabaseId, childrenDiv);
+                    }
+                    // Автоматически выбираем созданную таблицу и загружаем данные
+                    setTimeout(() => {
+                        selectTable(tableName);
+                    }, 200);
                 }
             });
         }

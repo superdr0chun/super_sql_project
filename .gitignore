@@ -1,8 +1,45 @@
 ```
 # Logs and temp files
 *.log
-server.log
+*.tmp
+*.swp
 
-# Database
-db.sqlite3
+# Database files
+*.sqlite3
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+dist/
+build/
+target/
+.gradle/
+
+# Compiled files
+*.pyc
+*.class
+*.o
+*.exe
+*.dll
+*.so
+*.a
+*.obj
+*.out
+
+# Editors
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
 ```

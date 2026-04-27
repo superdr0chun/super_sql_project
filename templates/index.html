@@ -393,7 +393,7 @@
         }
 
         function loadTablesInTree(databaseId, container) {
-            fetch('/api/tables/')
+            fetch(`/api/tables/?db_id=${databaseId}`)
                 .then(res => res.json())
                 .then(tables => {
                     container.innerHTML = '';
@@ -505,7 +505,7 @@
                 document.getElementById('tables-list').innerHTML = '<div style="color:#94a3b8; padding:10px;">Выберите БД</div>';
                 return;
             }
-            fetch('/api/tables/')
+            fetch(`/api/tables/?db_id=${currentDatabaseId}`)
                 .then(res => res.json())
                 .then(tables => {
                     const list = document.getElementById('tables-list');

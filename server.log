@@ -1,8 +1,10 @@
 Watching for file changes with StatReloader
-[27/Apr/2026 08:04:42] "GET /api/servers/ HTTP/1.1" 200 132
-[27/Apr/2026 08:04:45] "GET /api/servers/1/databases/ HTTP/1.1" 200 67
-Bad Request: /api/servers/1/databases/create/
-[27/Apr/2026 08:04:49] "POST /api/servers/1/databases/create/ HTTP/1.1" 400 129
-[27/Apr/2026 08:04:58] "POST /api/servers/1/databases/create/ HTTP/1.1" 200 57
-[27/Apr/2026 08:05:02] "POST /api/tables/create/ HTTP/1.1" 200 49
-[27/Apr/2026 08:05:05] "GET /api/tables/?db_id=2 HTTP/1.1" 200 9
+[27/Apr/2026 08:18:22] "GET /api/servers/ HTTP/1.1" 200 132
+[27/Apr/2026 08:18:29] "GET /api/servers/ HTTP/1.1" 200 2
+[27/Apr/2026 08:18:33] "POST /api/servers/create/ HTTP/1.1" 200 46
+[27/Apr/2026 08:18:36] "POST /api/servers/2/databases/create/ HTTP/1.1" 200 57
+[27/Apr/2026 08:18:42] "POST /api/tables/create/ HTTP/1.1" 200 49
+[27/Apr/2026 08:18:44] "GET /api/tables/?db_id=3 HTTP/1.1" 200 9
+[27/Apr/2026 08:18:47] "GET /api/tables/users/data/?db_id=3 HTTP/1.1" 200 2
+[27/Apr/2026 08:18:50] "POST /api/raw-sql/ HTTP/1.1" 200 67
+[27/Apr/2026 08:18:53] "GET /api/tables/users/data/?db_id=3 HTTP/1.1" 200 24

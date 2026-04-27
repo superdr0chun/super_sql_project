@@ -410,10 +410,15 @@
                         tableItem.innerHTML = `<span>${tableName.toUpperCase()}</span>`;
                         tableItem.onclick = (e) => {
                             e.stopPropagation();
+                        tableItem.onclick = () => {
                             currentDatabaseId = databaseId;
                             selectTable(tableName);
                         };
                         tableItem.oncontextmenu = (e) => showTreeContextMenu(e, 'table', null, tableName);
+                        
+                        // Активная подсветка
+                        tableItem.dataset.tableName = tableName;
+                        
                         container.appendChild(tableItem);
                     });
                 });
@@ -549,6 +554,11 @@
             document.querySelectorAll('.table-item').forEach(el => {
                 el.classList.remove('active');
                 if(el.dataset.tableName === tableName) {
+            // Снимаем выделение со всех таблиц
+            document.querySelectorAll('.table-item').forEach(el => {
+                el.classList.remove('active');
+                // Проверяем по data-атрибуту или по тексту
+                if(el.dataset.tableName === tableName || (el.querySelector('span') && el.querySelector('span').textContent === tableName.toUpperCase())) {
                     el.classList.add('active');
                 }
             });
@@ -556,6 +566,7 @@
             console.log('Выбрана таблица:', tableName, 'БД ID:', currentDatabaseId);
             
             // Принудительно загружаем данные
+            console.log('Выбрана таблица:', tableName, 'БД:', currentDatabaseId);
             loadCurrentTableData();
         }
 
@@ -563,6 +574,14 @@
             if (!currentTable) {
                 const container = document.getElementById('data-container');
                 container.innerHTML = '<p style="color:#94a3b8">Выберите таблицу слева</p>';
+            if (!currentTable || !currentDatabaseId) {
+                console.log('Нет выбранной таблицы или БД:', currentTable, currentDatabaseId);
+                const container = document.getElementById('data-container');
+                if (!currentTable) {
+                    container.innerHTML = '<p style="color:#94a3b8">Выберите таблицу слева</p>';
+                } else if (!currentDatabaseId) {
+                    container.innerHTML = '<p style="color:#ef4444">Ошибка: База данных не выбрана</p>';
+                }
                 return;
             }
             
@@ -859,6 +878,11 @@
                     setTimeout(() => {
                         selectTable(tableName);
                     }, 200);
+                    loadTablesInTree(currentDatabaseId, document.getElementById(`db-${currentDatabaseId}-children`));
+                    // Автоматически выбираем созданную таблицу
+                    setTimeout(() => {
+                        selectTable(tableName);
+                    }, 300);
                 }
             });
         }

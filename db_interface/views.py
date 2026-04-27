@@ -6,20 +6,20 @@ from django.conf import settings
 from sqlalchemy import create_engine, text, inspect, MetaData, Table, Column, String, Integer, Float, Boolean, DateTime, Date, Text, ForeignKey
 from sqlalchemy.orm import sessionmaker
 import json
+import os
 
 _engines = {}
 
-def get_engine(server):
-    key = f"{server.id}_{server.name}"
-    if key not in _engines:
-        conn_str = f"postgresql://{server.username}:{server.password}@{server.host}:{server.port}/{server.name}"
-        _engines[key] = create_engine(conn_str)
-    return _engines[key]
+def get_server_path(server):
+    return os.path.join(settings.BASE_DIR, 'servers', f'server_{server.id}')
+
+def get_db_path(db_obj):
+    server_path = get_server_path(db_obj.server)
+    return os.path.join(server_path, f'{db_obj.name}.db')
 
 def get_db_engine(db_obj):
-    server = db_obj.server
-    conn_str = f"postgresql://{server.username}:{server.password}@{server.host}:{server.port}/{db_obj.name}"
-    return create_engine(conn_str)
+    db_path = get_db_path(db_obj)
+    return create_engine(f'sqlite:///{db_path}')
 
 @api_view(['GET'])
 def get_servers(request):
@@ -30,11 +30,9 @@ def get_servers(request):
 @api_view(['POST'])
 def create_server(request):
     from .models import DatabaseServer
+    import os
+    
     name = request.data.get('name')
-    host = request.data.get('host', 'localhost')
-    port = request.data.get('port', 5432)
-    username = request.data.get('username', 'postgres')
-    password = request.data.get('password', '')
     
     if not name:
         return Response({"error": "Имя сервера обязательно"}, status=400)
@@ -42,11 +40,13 @@ def create_server(request):
     try:
         server = DatabaseServer.objects.create(
             name=name,
-            host=host,
-            port=port,
-            username=username,
-            password=password
+            host='localhost',
+            port=5432,
+            username='sqlite',
+            password=''
         )
+        server_path = get_server_path(server)
+        os.makedirs(server_path, exist_ok=True)
         return Response({"id": server.id, "message": "Сервер создан"})
     except Exception as e:
         return Response({"error": str(e)}, status=400)
@@ -54,8 +54,13 @@ def create_server(request):
 @api_view(['DELETE'])
 def delete_server(request, pk):
     from .models import DatabaseServer
+    import shutil
+    
     try:
         server = DatabaseServer.objects.get(pk=pk)
+        server_path = get_server_path(server)
+        if os.path.exists(server_path):
+            shutil.rmtree(server_path)
         server.delete()
         return Response({"message": "Сервер удален"})
     except DatabaseServer.DoesNotExist:
@@ -74,6 +79,7 @@ def get_databases(request, server_id):
 @api_view(['POST'])
 def create_database(request, server_id):
     from .models import Database, DatabaseServer
+    
     name = request.data.get('name')
     
     if not name:
@@ -82,11 +88,11 @@ def create_database(request, server_id):
     try:
         server = DatabaseServer.objects.get(pk=server_id)
         
-        conn_str = f"postgresql://{server.username}:{server.password}@{server.host}:{server.port}/postgres"
-        engine = create_engine(conn_str)
+        db_path = os.path.join(get_server_path(server), f'{name}.db')
         
+        engine = create_engine(f'sqlite:///{db_path}')
         with engine.connect() as conn:
-            conn.execution_options(isolation_level="AUTOCOMMIT").execute(text(f"CREATE DATABASE {name}"))
+            conn.execute(text("SELECT 1"))
         
         db = Database.objects.create(server=server, name=name)
         return Response({"id": db.id, "message": "База данных создана"})
@@ -100,14 +106,10 @@ def delete_database(request, server_id, db_id):
     from .models import Database
     try:
         db = Database.objects.get(pk=db_id, server_id=server_id)
-        db_name = db.name
-        server = db.server
+        db_path = get_db_path(db)
         
-        conn_str = f"postgresql://{server.username}:{server.password}@{server.host}:{server.port}/postgres"
-        engine = create_engine(conn_str)
-        
-        with engine.connect() as conn:
-            conn.execution_options(isolation_level="AUTOCOMMIT").execute(text(f"DROP DATABASE IF EXISTS {db_name}"))
+        if os.path.exists(db_path):
+            os.remove(db_path)
         
         db.delete()
         return Response({"message": "База данных удалена"})

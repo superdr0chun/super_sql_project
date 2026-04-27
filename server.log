@@ -1,0 +1,8 @@
+Watching for file changes with StatReloader
+[27/Apr/2026 08:04:42] "GET /api/servers/ HTTP/1.1" 200 132
+[27/Apr/2026 08:04:45] "GET /api/servers/1/databases/ HTTP/1.1" 200 67
+Bad Request: /api/servers/1/databases/create/
+[27/Apr/2026 08:04:49] "POST /api/servers/1/databases/create/ HTTP/1.1" 400 129
+[27/Apr/2026 08:04:58] "POST /api/servers/1/databases/create/ HTTP/1.1" 200 57
+[27/Apr/2026 08:05:02] "POST /api/tables/create/ HTTP/1.1" 200 49
+[27/Apr/2026 08:05:05] "GET /api/tables/?db_id=2 HTTP/1.1" 200 9

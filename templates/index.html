@@ -69,6 +69,23 @@
             border-left-color: var(--gold);
             color: var(--gold);
         }
+        .db-children, .server-children {
+            margin-left: 20px;
+            border-left: 1px solid rgba(197,160,89,0.3);
+            display: none;
+        }
+        .db-children.expanded, .server-children.expanded {
+            display: block;
+        }
+        .expand-btn {
+            background: transparent;
+            border: none;
+            color: var(--gold);
+            cursor: pointer;
+            font-size: 10px;
+            margin-right: 5px;
+            width: 15px;
+        }
         .item-actions { display: flex; gap: 5px; }
         .item-btn {
             background: transparent; border: none; color: #94a3b8;
@@ -133,6 +150,16 @@
         ::-webkit-scrollbar-track { background: var(--gray); }
         ::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 4px; }
 
+        .z-particle {
+            position: fixed;
+            pointer-events: none;
+            font-weight: bold;
+            font-size: 20px;
+            color: #c5a059;
+            text-shadow: 0 0 5px rgba(197,160,89,0.5);
+            z-index: 9999;
+        }
+
         .modal-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.6); display: none;
@@ -157,8 +184,8 @@
     <div id="sidebar">
         <div id="logo">РЕДАКТОР БД "ЗДАРОВ"</div>
         <div style="text-align:center; margin-bottom:15px;">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/f/f3/Flag_of_Russia.svg" alt="RF" style="width:60px; height:40px; border:1px solid #ccc; cursor:pointer;" onclick="clickCounter++" id="flag-img">
-            <div style="color:#94a3b8; font-size:12px; margin-top:5px;">Кликов: <span id="click-count">0</span></div>
+            <img src="https://upload.wikimedia.org/wikipedia/commons/f/f3/Flag_of_Russia.svg" alt="RF" style="width:60px; height:40px; border:1px solid #ccc; cursor:pointer;" id="flag-clicker">
+            <div style="color:#94a3b8; font-size:12px; margin-top:5px;">Кликов: <span id="click-counter">0</span></div>
         </div>
         
         <div class="section-title">Серверы</div>
@@ -170,6 +197,7 @@
         <div id="databases-list"><div class="db-item" style="border:none; color:#94a3b8;">Выберите сервер</div></div>
         
         <div class="section-title">Таблицы</div>
+        <button class="btn" onclick="openCreateTableModal()" style="width:100%;margin-bottom:10px;font-size:12px;padding:8px;" id="add-table-btn" disabled>+ Создать таблицу</button>
         <div id="tables-list"><div class="table-item" style="border:none; color:#94a3b8;">Выберите БД</div></div>
     </div>
 
@@ -209,6 +237,15 @@
         <div class="menu-item" onclick="deleteRecord()" style="color: #ef4444;"><span></span>Удалить запись</div>
     </div>
 
+    <div id="tree-context-menu">
+        <div class="menu-item" onclick="executeTreeAction('create')"><span></span>Создать</div>
+        <div class="menu-item" onclick="executeTreeAction('rename')"><span></span>Переименовать</div>
+        <div class="menu-item" onclick="executeTreeAction('delete')"><span></span>Удалить</div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" onclick="executeTreeAction('refresh')"><span></span>Обновить</div>
+        <div class="menu-item" onclick="executeTreeAction('properties')"><span></span>Свойства</div>
+    </div>
+
     <div id="add-modal" class="modal-overlay">
         <div class="modal">
             <h3>Добавление новой записи</h3>
@@ -220,6 +257,22 @@
         </div>
     </div>
 
+    <div id="create-table-modal" class="modal-overlay">
+        <div class="modal">
+            <h3>Создание новой таблицы</h3>
+            <div class="form-group">
+                <label>Имя таблицы</label>
+                <input type="text" id="new-table-name" placeholder="my_table">
+            </div>
+            <div id="table-columns-container"></div>
+            <button class="btn" onclick="addColumnField()" style="margin-bottom:15px;">+ Добавить колонку</button>
+            <div class="modal-buttons">
+                <button class="btn" onclick="closeCreateTableModal()">Отмена</button>
+                <button class="btn" onclick="submitCreateTable()" style="background: var(--gold); color: var(--navy);">Создать</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentTable = null;
         let selectedRowData = null;
@@ -227,14 +280,37 @@
         let tableDataCache = [];
         let currentServerId = null;
         let currentDatabaseId = null;
-        let clickCounter = 0;
+        let clickCount = 0;
+        let selectedTreeItem = null;
+        let columnCounter = 0;
 
-        setInterval(function() {
-            document.getElementById('click-count').innerText = clickCounter;
-        }, 100);
+        const flagEl = document.getElementById('flag-clicker');
+        const counterEl = document.getElementById('click-counter');
+
+        flagEl.addEventListener('click', (e) => {
+            clickCount++;
+            counterEl.textContent = clickCount;
+            const z = document.createElement('div');
+            z.className = 'z-particle';
+            z.textContent = 'Z';
+            document.body.appendChild(z);
+            let x = e.clientX - 20, y = e.clientY;
+            const vx = (Math.random() - 0.5) * 3, vy = -2 - Math.random() * 2;
+            let opacity = 1, rotation = 0, rotSpeed = (Math.random() - 0.5) * 10;
+            z.style.left = `${x}px`; z.style.top = `${y}px`;
+            function animate() {
+                x += vx; y += vy; rotation += rotSpeed; opacity -= 0.006;
+                z.style.left = `${x}px`; z.style.top = `${y}px`;
+                z.style.transform = `rotate(${rotation}deg)`; z.style.opacity = opacity;
+                if (y < -60 || opacity <= 0) { z.remove(); return; }
+                requestAnimationFrame(animate);
+            }
+            requestAnimationFrame(animate);
+        });
 
         window.onload = function() {
             loadServers();
+            addColumnField();
         };
 
         function loadServers() {
@@ -248,11 +324,101 @@
                         return;
                     }
                     servers.forEach(s => {
-                        const el = document.createElement('div');
-                        el.className = 'server-item';
-                        el.innerHTML = `<span>${s.name}</span><div class="item-actions"><button class="item-btn delete" onclick="deleteServer(event, ${s.id})">✕</button></div>`;
-                        el.onclick = (e) => { if(e.target.tagName !== 'BUTTON') selectServer(s.id, s.name); };
-                        list.appendChild(el);
+                        const serverDiv = document.createElement('div');
+                        const serverItem = document.createElement('div');
+                        serverItem.className = 'server-item';
+                        serverItem.innerHTML = `<button class="expand-btn" onclick="toggleServerChildren(event, ${s.id})">▶</button><span>${s.name}</span><div class="item-actions"><button class="item-btn delete" onclick="deleteServer(event, ${s.id})">✕</button></div>`;
+                        serverItem.onclick = (e) => { if(e.target.tagName !== 'BUTTON') selectServer(s.id, s.name); };
+                        serverItem.oncontextmenu = (e) => showTreeContextMenu(e, 'server', s.id, s.name);
+                        
+                        const childrenDiv = document.createElement('div');
+                        childrenDiv.className = 'server-children';
+                        childrenDiv.id = `server-${s.id}-children`;
+                        childrenDiv.innerHTML = '<div style="color:#94a3b8; padding:10px; font-size:12px;">Нажмите ▶ для просмотра БД</div>';
+                        
+                        serverDiv.appendChild(serverItem);
+                        serverDiv.appendChild(childrenDiv);
+                        list.appendChild(serverDiv);
+                    });
+                });
+        }
+
+        function toggleServerChildren(event, serverId) {
+            event.stopPropagation();
+            const childrenDiv = document.getElementById(`server-${serverId}-children`);
+            const btn = event.target;
+            if (childrenDiv.classList.contains('expanded')) {
+                childrenDiv.classList.remove('expanded');
+                btn.textContent = '▶';
+            } else {
+                childrenDiv.classList.add('expanded');
+                btn.textContent = '▼';
+                loadDatabasesInTree(serverId, childrenDiv);
+            }
+        }
+
+        function loadDatabasesInTree(serverId, container) {
+            fetch(`/api/servers/${serverId}/databases/`)
+                .then(res => res.json())
+                .then(dbs => {
+                    container.innerHTML = '';
+                    if(dbs.length === 0) {
+                        container.innerHTML = '<div style="color:#94a3b8; padding:10px; font-size:12px;">Нет баз данных</div>';
+                        return;
+                    }
+                    dbs.forEach(db => {
+                        const dbDiv = document.createElement('div');
+                        const dbItem = document.createElement('div');
+                        dbItem.className = 'db-item';
+                        dbItem.innerHTML = `<button class="expand-btn" onclick="toggleDatabaseChildren(event, ${serverId}, ${db.id})">▶</button><span>${db.name}</span><div class="item-actions"><button class="item-btn delete" onclick="deleteDatabase(event, ${serverId}, ${db.id})">✕</button></div>`;
+                        dbItem.onclick = (e) => { if(e.target.tagName !== 'BUTTON') selectDatabase(serverId, db.id, db.name); };
+                        dbItem.oncontextmenu = (e) => showTreeContextMenu(e, 'database', db.id, db.name, serverId);
+                        
+                        const dbChildrenDiv = document.createElement('div');
+                        dbChildrenDiv.className = 'db-children';
+                        dbChildrenDiv.id = `db-${db.id}-children`;
+                        dbChildrenDiv.innerHTML = '<div style="color:#94a3b8; padding:10px; font-size:12px;">Нажмите ▶ для просмотра таблиц</div>';
+                        
+                        dbDiv.appendChild(dbItem);
+                        dbDiv.appendChild(dbChildrenDiv);
+                        container.appendChild(dbDiv);
+                    });
+                });
+        }
+
+        function toggleDatabaseChildren(event, serverId, databaseId) {
+            event.stopPropagation();
+            const childrenDiv = document.getElementById(`db-${databaseId}-children`);
+            const btn = event.target;
+            if (childrenDiv.classList.contains('expanded')) {
+                childrenDiv.classList.remove('expanded');
+                btn.textContent = '▶';
+            } else {
+                childrenDiv.classList.add('expanded');
+                btn.textContent = '▼';
+                loadTablesInTree(databaseId, childrenDiv);
+            }
+        }
+
+        function loadTablesInTree(databaseId, container) {
+            fetch('/api/tables/')
+                .then(res => res.json())
+                .then(tables => {
+                    container.innerHTML = '';
+                    const hiddenTables = ['auth_group', 'auth_permission', 'auth_group_permissions', 'auth_user', 'auth_user_groups', 'auth_user_permissions', 'db_servers', 'db_databases'];
+                    const visibleTables = tables.filter(t => !hiddenTables.includes(t.toLowerCase()));
+                    
+                    if(visibleTables.length === 0) {
+                        container.innerHTML = '<div style="color:#94a3b8; padding:10px; font-size:12px;">Нет таблиц</div>';
+                        return;
+                    }
+                    visibleTables.forEach(tableName => {
+                        const tableItem = document.createElement('div');
+                        tableItem.className = 'table-item';
+                        tableItem.innerHTML = `<span>${tableName.toUpperCase()}</span>`;
+                        tableItem.onclick = () => selectTable(tableName);
+                        tableItem.oncontextmenu = (e) => showTreeContextMenu(e, 'table', null, tableName);
+                        container.appendChild(tableItem);
                     });
                 });
         }
@@ -502,6 +668,164 @@
             });
         }
         function clearSQL() { document.getElementById('sql-input').value = ''; }
+
+        function showTreeContextMenu(e, type, id, name, serverId) {
+            e.preventDefault();
+            e.stopPropagation();
+            selectedTreeItem = {type, id, name, serverId};
+            const menu = document.getElementById('tree-context-menu');
+            menu.style.display = 'block';
+            let left = e.pageX, top = e.pageY;
+            if (left + 220 > window.innerWidth) left = e.pageX - 220;
+            if (top + 250 > window.innerHeight) top = e.pageY - 250;
+            menu.style.left = left + 'px';
+            menu.style.top = top + 'px';
+        }
+
+        document.addEventListener('click', () => {
+            document.getElementById('context-menu').style.display = 'none';
+            document.getElementById('tree-context-menu').style.display = 'none';
+        });
+
+        function executeTreeAction(action) {
+            if (!selectedTreeItem) return;
+            const {type, id, name, serverId} = selectedTreeItem;
+            
+            if (action === 'create') {
+                if (type === 'server') openDatabaseModal();
+                else if (type === 'database') openCreateTableModal();
+                else alert('Нельзя создать элемент внутри таблицы');
+            } else if (action === 'delete') {
+                if (type === 'server') deleteServer({stopPropagation:()=>{}}, id);
+                else if (type === 'database') deleteDatabase({stopPropagation:()=>{}}, serverId, id);
+                else if (type === 'table') {
+                    if(confirm(`Удалить таблицу ${name}?`)) {
+                        fetch('/api/raw-sql/', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({sql: `DROP TABLE ${name}`})
+                        }).then(() => loadTablesInTree(currentDatabaseId, document.getElementById(`db-${currentDatabaseId}-children`)));
+                    }
+                }
+            } else if (action === 'rename') {
+                const newName = prompt(`Переименовать ${type}:`, name);
+                if (newName && newName !== name) {
+                    if (type === 'table') {
+                        fetch('/api/raw-sql/', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({sql: `ALTER TABLE ${name} RENAME TO ${newName}`})
+                        }).then(() => loadTablesInTree(currentDatabaseId, document.getElementById(`db-${currentDatabaseId}-children`)));
+                    } else {
+                        alert('Переименование серверов и БД пока не поддерживается');
+                    }
+                }
+            } else if (action === 'refresh') {
+                if (type === 'server') {
+                    const childrenDiv = document.getElementById(`server-${id}-children`);
+                    if (childrenDiv.classList.contains('expanded')) loadDatabasesInTree(id, childrenDiv);
+                } else if (type === 'database') {
+                    const childrenDiv = document.getElementById(`db-${id}-children`);
+                    if (childrenDiv.classList.contains('expanded')) loadTablesInTree(id, childrenDiv);
+                } else if (type === 'table') {
+                    loadCurrentTableData();
+                }
+            } else if (action === 'properties') {
+                if (type === 'server') alert(`Сервер: ${name}\nID: ${id}`);
+                else if (type === 'database') alert(`База данных: ${name}\nID: ${id}`);
+                else if (type === 'table') {
+                    fetch(`/api/tables/${name}/structure/`).then(res => res.json()).then(cols => {
+                        let info = `Таблица: ${name}\n\nКолонки:\n`;
+                        cols.forEach(c => info += `- ${c.name} (${c.type})\n`);
+                        alert(info);
+                    });
+                }
+            }
+        }
+
+        function openCreateTableModal() {
+            if (!currentDatabaseId) { alert('Выберите базу данных'); return; }
+            document.getElementById('new-table-name').value = '';
+            document.getElementById('table-columns-container').innerHTML = '';
+            columnCounter = 0;
+            addColumnField();
+            document.getElementById('create-table-modal').classList.add('active');
+        }
+
+        function closeCreateTableModal() {
+            document.getElementById('create-table-modal').classList.remove('active');
+        }
+
+        function addColumnField() {
+            columnCounter++;
+            const container = document.getElementById('table-columns-container');
+            const div = document.createElement('div');
+            div.className = 'form-group';
+            div.style.display = 'flex';
+            div.style.gap = '10px';
+            div.innerHTML = `
+                <input type="text" id="col-name-${columnCounter}" placeholder="Имя колонки" style="flex:1">
+                <select id="col-type-${columnCounter}" style="padding:10px; border:1px solid var(--border); border-radius:4px;">
+                    <option value="INTEGER">INTEGER</option>
+                    <option value="TEXT">TEXT</option>
+                    <option value="VARCHAR">VARCHAR</option>
+                    <option value="BOOLEAN">BOOLEAN</option>
+                    <option value="DATE">DATE</option>
+                    <option value="TIMESTAMP">TIMESTAMP</option>
+                    <option value="FLOAT">FLOAT</option>
+                </select>
+                <label><input type="checkbox" id="col-pk-${columnCounter}"> PK</label>
+                <button class="btn btn-danger" onclick="this.parentElement.remove()" style="padding:8px 12px;">✕</button>
+            `;
+            container.appendChild(div);
+        }
+
+        function submitCreateTable() {
+            const tableName = document.getElementById('new-table-name').value.trim();
+            if (!tableName) { alert('Введите имя таблицы'); return; }
+            
+            const colNames = document.querySelectorAll('[id^="col-name-"]');
+            if (colNames.length === 0) { alert('Добавьте хотя бы одну колонку'); return; }
+            
+            let columns = [];
+            let hasPk = false;
+            colNames.forEach(input => {
+                const num = input.id.split('-')[2];
+                const name = document.getElementById(`col-name-${num}`).value.trim();
+                const type = document.getElementById(`col-type-${num}`).value;
+                const isPk = document.getElementById(`col-pk-${num}`).checked;
+                if (name) {
+                    columns.push({name, type, isPk});
+                    if (isPk) hasPk = true;
+                }
+            });
+            
+            if (columns.length === 0) { alert('Заполните имена колонок'); return; }
+            if (!hasPk) {
+                if(!confirm('Нет первичного ключа (PK). Создать без него?')) return;
+            }
+            
+            let sql = `CREATE TABLE ${tableName} (`;
+            const colDefs = columns.map(c => {
+                let def = `${c.name} ${c.type}`;
+                if (c.isPk) def += ' PRIMARY KEY';
+                return def;
+            });
+            sql += colDefs.join(', ') + ')';
+            
+            fetch('/api/raw-sql/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({sql})
+            }).then(res => res.json()).then(result => {
+                if (result.error) alert(`Ошибка: ${result.error}`);
+                else {
+                    alert('Таблица создана!');
+                    closeCreateTableModal();
+                    loadTablesInTree(currentDatabaseId, document.getElementById(`db-${currentDatabaseId}-children`));
+                }
+            });
+        }
     </script>
 </body>
 </html>

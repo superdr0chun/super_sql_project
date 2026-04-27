@@ -1,3 +1,7 @@
 ```
+# Logs and temp files
 *.log
+
+# Database files
+db.sqlite3
 ```

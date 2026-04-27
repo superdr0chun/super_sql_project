@@ -406,8 +406,15 @@
                         const tableItem = document.createElement('div');
                         tableItem.className = 'table-item';
                         tableItem.innerHTML = `<span>${tableName.toUpperCase()}</span>`;
-                        tableItem.onclick = () => selectTable(tableName);
+                        tableItem.onclick = () => {
+                            currentDatabaseId = databaseId;
+                            selectTable(tableName);
+                        };
                         tableItem.oncontextmenu = (e) => showTreeContextMenu(e, 'table', null, tableName);
+                        
+                        // Активная подсветка
+                        tableItem.dataset.tableName = tableName;
+                        
                         container.appendChild(tableItem);
                     });
                 });
@@ -526,7 +533,10 @@
                         const el = document.createElement('div');
                         el.className = 'table-item';
                         el.innerText = t.toUpperCase();
-                        el.onclick = () => selectTable(t);
+                        el.onclick = () => {
+                            currentDatabaseId = currentDatabaseId;
+                            selectTable(t);
+                        };
                         list.appendChild(el);
                     });
                 });
@@ -535,26 +545,40 @@
         function selectTable(tableName) {
             currentTable = tableName;
             document.getElementById('current-view').innerText = `Таблица: ${tableName.toUpperCase()}`;
+            
+            // Снимаем выделение со всех таблиц
             document.querySelectorAll('.table-item').forEach(el => {
                 el.classList.remove('active');
-                if(el.querySelector('span') && el.querySelector('span').textContent === tableName.toUpperCase()) {
+                // Проверяем по data-атрибуту или по тексту
+                if(el.dataset.tableName === tableName || (el.querySelector('span') && el.querySelector('span').textContent === tableName.toUpperCase())) {
                     el.classList.add('active');
                 }
             });
+            
+            console.log('Выбрана таблица:', tableName, 'БД:', currentDatabaseId);
             loadCurrentTableData();
         }
 
         function loadCurrentTableData() {
             if (!currentTable || !currentDatabaseId) {
                 console.log('Нет выбранной таблицы или БД:', currentTable, currentDatabaseId);
+                const container = document.getElementById('data-container');
+                if (!currentTable) {
+                    container.innerHTML = '<p style="color:#94a3b8">Выберите таблицу слева</p>';
+                } else if (!currentDatabaseId) {
+                    container.innerHTML = '<p style="color:#ef4444">Ошибка: База данных не выбрана</p>';
+                }
                 return;
             }
             const container = document.getElementById('data-container');
             container.innerHTML = '<p style="color:#94a3b8">Загрузка данных...</p>';
             
+            console.log('Загрузка данных для таблицы:', currentTable, 'БД ID:', currentDatabaseId);
+            
             fetch(`/api/tables/${currentTable}/data/?db_id=${currentDatabaseId}`)
                 .then(res => res.json())
                 .then(data => {
+                    console.log('Получены данные:', data);
                     if (data.error) { 
                         container.innerHTML = `<p style="color:#ef4444">Ошибка: ${data.error}</p>`; 
                         return; 
@@ -812,6 +836,10 @@
                     alert('Таблица создана!');
                     closeCreateTableModal();
                     loadTablesInTree(currentDatabaseId, document.getElementById(`db-${currentDatabaseId}-children`));
+                    // Автоматически выбираем созданную таблицу
+                    setTimeout(() => {
+                        selectTable(tableName);
+                    }, 300);
                 }
             });
         }

@@ -1,0 +1,47 @@
+```
+# Database
+db.sqlite3
+
+# Dependencies
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment
+.env
+.env.local
+.env.*
+.venv/
+venv/
+.envrc
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python specific
+*.egg-info/
+dist/
+build/
+pip-log.txt
+.coverage
+htmlcov/
+.coverage.*
+
+# Testing
+.pytest_cache/
+.mypy_cache/
+
+# Backup files
+*~
+```

@@ -29,7 +29,7 @@
             pointer-events: none;
         }
         #sidebar {
-            width: 300px;
+            width: 320px;
             background: var(--navy);
             border-right: 3px solid var(--gold);
             display: flex; flex-direction: column;
@@ -45,39 +45,38 @@
             padding-bottom: 15px; margin-bottom: 15px;
             text-align: center;
         }
-        #flag-clicker {
-            width: 100%; height: 60px;
-            cursor: pointer; position: relative;
-            overflow: hidden; border: 2px solid var(--gold);
-            border-radius: 8px; margin-bottom: 10px;
-            transition: transform 0.1s, box-shadow 0.2s;
-            display: flex; flex-direction: column;
+        .section-title {
+            color: var(--gold);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 15px 0 10px 0;
+            padding-bottom: 5px;
+            border-bottom: 1px solid rgba(197,160,89,0.3);
         }
-        #flag-clicker:hover { transform: scale(1.02); box-shadow: 0 0 15px rgba(197,160,89,0.4); }
-        #flag-clicker:active { transform: scale(0.98); }
-        .flag-stripe { flex: 1; width: 100%; }
-        .flag-stripe.white { background: #ffffff; }
-        .flag-stripe.blue { background: #0039a6; }
-        .flag-stripe.red { background: #d52b1e; }
-        #click-counter {
-            color: var(--gold); text-align: center;
-            margin-bottom: 20px; font-weight: bold; font-size: 22px;
-            text-shadow: 0 0 5px rgba(197,160,89,0.3);
-        }
-        .click-hint {
-            color: #94a3b8; font-size: 11px; text-align: center;
-            margin-top: -15px; margin-bottom: 15px;
-        }
-        #tables-list { flex: 1; overflow-y: auto; }
-        .table-item {
-            padding: 12px; margin-bottom: 6px;
+        #servers-list, #databases-list, #tables-list { flex: 1; overflow-y: auto; }
+        .server-item, .db-item, .table-item {
+            padding: 10px; margin-bottom: 6px;
             background: transparent; border: none; border-left: 3px solid transparent;
             color: #e2e8f0; cursor: pointer; transition: 0.2s;
-            display: flex; justify-content: space-between; font-weight: 500;
+            display: flex; justify-content: space-between; align-items: center; font-weight: 500;
+            font-size: 13px;
         }
+        .server-item:hover, .server-item.active,
+        .db-item:hover, .db-item.active,
         .table-item:hover, .table-item.active {
             background: rgba(197,160,89,0.15);
             border-left-color: var(--gold);
+            color: var(--gold);
+        }
+        .item-actions { display: flex; gap: 5px; }
+        .item-btn {
+            background: transparent; border: none; color: #94a3b8;
+            cursor: pointer; padding: 2px 6px; font-size: 12px;
+            border-radius: 3px;
+        }
+        .item-btn:hover { background: rgba(197,160,89,0.2); color: var(--gold); }
+        .item-btn.delete:hover { background: rgba(239,68,68,0.2); color: #ef4444; }
             color: var(--gold);
         }
         #main { flex: 1; display: flex; flex-direction: column; padding: 25px; z-index: 10; position: relative; }
@@ -134,17 +133,6 @@
         ::-webkit-scrollbar-track { background: var(--gray); }
         ::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 4px; }
 
-        .z-particle {
-            position: fixed;
-            font-size: 42px;
-            font-weight: 900;
-            color: var(--gold);
-            text-shadow: 0 0 12px rgba(197,160,89,0.9), 2px 2px 0 #000;
-            pointer-events: none;
-            z-index: 1000;
-            user-select: none;
-        }
-
         .modal-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.6); display: none;
@@ -168,13 +156,17 @@
     
     <div id="sidebar">
         <div id="logo">РЕДАКТОР БД "ЗДАРОВ"</div>
-        <div id="flag-clicker">
-            <div class="flag-stripe white"></div>
-            <div class="flag-stripe blue"></div>
-            <div class="flag-stripe red"></div>
-        </div>
-        <div id="click-counter">0</div>
-        <div id="tables-list"><div class="table-item" style="border:none; color:#94a3b8;">Загрузка таблиц...</div></div>
+        
+        <div class="section-title">Серверы</div>
+        <button class="btn" onclick="openServerModal()" style="width:100%;margin-bottom:10px;font-size:12px;padding:8px;">+ Добавить сервер</button>
+        <div id="servers-list"><div class="server-item" style="border:none; color:#94a3b8;">Загрузка...</div></div>
+        
+        <div class="section-title">Базы данных</div>
+        <button class="btn" onclick="openDatabaseModal()" style="width:100%;margin-bottom:10px;font-size:12px;padding:8px;" id="add-db-btn" disabled>+ Добавить БД</button>
+        <div id="databases-list"><div class="db-item" style="border:none; color:#94a3b8;">Выберите сервер</div></div>
+        
+        <div class="section-title">Таблицы</div>
+        <div id="tables-list"><div class="table-item" style="border:none; color:#94a3b8;">Выберите БД</div></div>
     </div>
 
     <div id="main">
@@ -228,36 +220,132 @@
         let currentTable = null;
         let selectedRowData = null;
         let selectedRowId = null;
-        let clickCount = 0;
         let tableDataCache = [];
+        let currentServerId = null;
+        let currentDatabaseId = null;
 
-        const flagEl = document.getElementById('flag-clicker');
-        const counterEl = document.getElementById('click-counter');
+        window.onload = function() {
+            loadServers();
+        };
 
-        flagEl.addEventListener('click', (e) => {
-            clickCount++;
-            counterEl.textContent = clickCount;
-            const z = document.createElement('div');
-            z.className = 'z-particle';
-            z.textContent = 'Z';
-            document.body.appendChild(z);
-            let x = e.clientX - 20, y = e.clientY;
-            const vx = (Math.random() - 0.5) * 3, vy = -2 - Math.random() * 2;
-            let opacity = 1, rotation = 0, rotSpeed = (Math.random() - 0.5) * 10;
-            z.style.left = `${x}px`; z.style.top = `${y}px`;
-            function animate() {
-                x += vx; y += vy; rotation += rotSpeed; opacity -= 0.006;
-                z.style.left = `${x}px`; z.style.top = `${y}px`;
-                z.style.transform = `rotate(${rotation}deg)`; z.style.opacity = opacity;
-                if (y < -60 || opacity <= 0) { z.remove(); return; }
-                requestAnimationFrame(animate);
-            }
-            requestAnimationFrame(animate);
-        });
+        function loadServers() {
+            fetch('/api/servers/')
+                .then(res => res.json())
+                .then(servers => {
+                    const list = document.getElementById('servers-list');
+                    list.innerHTML = '';
+                    if(servers.length === 0) {
+                        list.innerHTML = '<div style="color:#94a3b8; padding:10px;">Нет серверов</div>';
+                        return;
+                    }
+                    servers.forEach(s => {
+                        const el = document.createElement('div');
+                        el.className = 'server-item';
+                        el.innerHTML = `<span>${s.name}</span><div class="item-actions"><button class="item-btn delete" onclick="deleteServer(event, ${s.id})">✕</button></div>`;
+                        el.onclick = (e) => { if(e.target.tagName !== 'BUTTON') selectServer(s.id, s.name); };
+                        list.appendChild(el);
+                    });
+                });
+        }
 
-        window.onload = loadTables;
+        function selectServer(serverId, serverName) {
+            currentServerId = serverId;
+            document.getElementById('add-db-btn').disabled = false;
+            document.querySelectorAll('.server-item').forEach(el => el.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            loadDatabases(serverId);
+        }
+
+        function loadDatabases(serverId) {
+            fetch(`/api/servers/${serverId}/databases/`)
+                .then(res => res.json())
+                .then(dbs => {
+                    const list = document.getElementById('databases-list');
+                    list.innerHTML = '';
+                    if(dbs.length === 0) {
+                        list.innerHTML = '<div style="color:#94a3b8; padding:10px;">Нет баз данных</div>';
+                        return;
+                    }
+                    dbs.forEach(db => {
+                        const el = document.createElement('div');
+                        el.className = 'db-item';
+                        el.innerHTML = `<span>${db.name}</span><div class="item-actions"><button class="item-btn delete" onclick="deleteDatabase(event, ${serverId}, ${db.id})">✕</button></div>`;
+                        el.onclick = (e) => { if(e.target.tagName !== 'BUTTON') selectDatabase(serverId, db.id, db.name); };
+                        list.appendChild(el);
+                    });
+                });
+        }
+
+        function selectDatabase(serverId, databaseId, databaseName) {
+            currentServerId = serverId;
+            currentDatabaseId = databaseId;
+            document.querySelectorAll('.db-item').forEach(el => el.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            
+            fetch(`/api/servers/${serverId}/databases/${databaseId}/connect/`, {method: 'POST'})
+                .then(() => {
+                    document.getElementById('current-view').innerText = `БД: ${databaseName}`;
+                    loadTables();
+                })
+                .catch(err => alert('Ошибка подключения: ' + err));
+        }
+
+        function openServerModal() {
+            const name = prompt('Имя сервера:');
+            if (!name) return;
+            const host = prompt('Хост (localhost):', 'localhost') || 'localhost';
+            const port = prompt('Порт (5432):', '5432') || '5432';
+            const username = prompt('Пользователь (postgres):', 'postgres') || 'postgres';
+            const password = prompt('Пароль:', '') || '';
+            
+            fetch('/api/servers/create/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name, host, port: parseInt(port), username, password})
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.error) alert(data.error);
+                else loadServers();
+            });
+        }
+
+        function deleteServer(event, id) {
+            event.stopPropagation();
+            if(!confirm('Удалить сервер?')) return;
+            fetch(`/api/servers/${id}/delete/`, {method: 'DELETE'})
+                .then(() => loadServers());
+        }
+
+        function openDatabaseModal() {
+            if(!currentServerId) { alert('Выберите сервер'); return; }
+            const name = prompt('Имя базы данных:');
+            if (!name) return;
+            
+            fetch(`/api/servers/${currentServerId}/databases/create/`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name})
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.error) alert(data.error);
+                else loadDatabases(currentServerId);
+            });
+        }
+
+        function deleteDatabase(event, serverId, dbId) {
+            event.stopPropagation();
+            if(!confirm('Удалить базу данных?')) return;
+            fetch(`/api/servers/${serverId}/databases/${dbId}/delete/`, {method: 'DELETE'})
+                .then(() => loadDatabases(serverId));
+        }
 
         function loadTables() {
+            if (!currentDatabaseId) {
+                document.getElementById('tables-list').innerHTML = '<div style="color:#94a3b8; padding:10px;">Выберите БД</div>';
+                return;
+            }
             fetch('/api/tables/')
                 .then(res => res.json())
                 .then(tables => {

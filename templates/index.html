@@ -123,7 +123,7 @@
         .btn:hover { background: var(--gold); color: var(--navy); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(197,160,89,0.3); }
         .btn-danger { background: #ef4444; }
         .btn-danger:hover { background: #dc2626; box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
-        #data-table { width: 100%; border-collapse: collapse; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+        #data-table { width: auto; max-width: 90%; margin: 0 auto; border-collapse: collapse; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
         #data-table th, #data-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
         #data-table th { background: var(--navy); color: var(--gold); font-weight: 600; border-bottom: 2px solid var(--gold); }
         #data-table tr { cursor: pointer; }
@@ -231,11 +231,9 @@
 
     <div id="tree-context-menu">
         <div class="menu-item" onclick="executeTreeAction('create')"><span></span><span id="tree-action-create-text">Создать</span></div>
-        <div class="menu-item" onclick="executeTreeAction('rename')"><span></span>Переименовать</div>
         <div class="menu-item" onclick="executeTreeAction('delete')"><span></span>Удалить</div>
         <div class="menu-divider"></div>
         <div class="menu-item" onclick="executeTreeAction('refresh')"><span></span>Обновить</div>
-        <div class="menu-item" onclick="executeTreeAction('properties')"><span></span>Свойства</div>
     </div>
 
     <div id="add-modal" class="modal-overlay">
@@ -697,19 +695,6 @@
                         }).then(() => loadTablesInTree(currentDatabaseId, document.getElementById(`db-${currentDatabaseId}-children`)));
                     }
                 }
-            } else if (action === 'rename') {
-                const newName = prompt(`Переименовать ${type}:`, name);
-                if (newName && newName !== name) {
-                    if (type === 'table') {
-                        fetch('/api/raw-sql/', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({sql: `ALTER TABLE ${name} RENAME TO ${newName}`})
-                        }).then(() => loadTablesInTree(currentDatabaseId, document.getElementById(`db-${currentDatabaseId}-children`)));
-                    } else {
-                        alert('Переименование серверов и БД пока не поддерживается');
-                    }
-                }
             } else if (action === 'refresh') {
                 if (type === 'server') {
                     const childrenDiv = document.getElementById(`server-${id}-children`);
@@ -719,16 +704,6 @@
                     if (childrenDiv.classList.contains('expanded')) loadTablesInTree(id, childrenDiv);
                 } else if (type === 'table') {
                     loadCurrentTableData();
-                }
-            } else if (action === 'properties') {
-                if (type === 'server') alert(`Сервер: ${name}\nID: ${id}`);
-                else if (type === 'database') alert(`База данных: ${name}\nID: ${id}`);
-                else if (type === 'table') {
-                    fetch(`/api/tables/${name}/structure/`).then(res => res.json()).then(cols => {
-                        let info = `Таблица: ${name}\n\nКолонки:\n`;
-                        cols.forEach(c => info += `- ${c.name} (${c.type})\n`);
-                        alert(info);
-                    });
                 }
             }
         }
